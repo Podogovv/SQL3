@@ -42,102 +42,101 @@ create table order_items (
     item_list_price_at_sale float4 not null,
     item_standard_cost_at_sale float4
 );
---1  
-SELECT 
+
+--1
+select
     job_industry_category,
-    COUNT(*) AS customer_count
-FROM customer
-GROUP BY job_industry_category
-ORDER BY customer_count DESC;
+    count(*) AS customer_count
+from customer
+group by job_industry_category
+order by customer_count desc;
     
- --2
-SELECT
-    EXTRACT(YEAR FROM o.order_date) AS year,
-    EXTRACT(MONTH FROM o.order_date) AS month,
+--2
+select
+    extract(year from o.order_date) as year,
+    extract(month from o.order_date) as month,
     c.job_industry_category,
-    SUM(oi.quantity * oi.item_list_price_at_sale) AS total_revenue
-FROM orders o
-JOIN customer c ON o.customer_id = c.customer_id
-JOIN order_items oi ON o.order_id = oi.order_id
-WHERE o.order_status = 'Approved'
-GROUP BY
-    EXTRACT(YEAR FROM o.order_date),
-    EXTRACT(MONTH FROM o.order_date),
+    sum(oi.quantity * oi.item_list_price_at_sale) as total_revenue
+from orders o
+join customer c on o.customer_id = c.customer_id
+join order_items oi on o.order_id = oi.order_id
+where o.order_status = 'Approved'
+group by
+    extract(year from o.order_date),
+    extract(month from o.order_date),
     c.job_industry_category
-ORDER BY
+order by
     year,
     month,
     c.job_industry_category;
 
-
 --3
-SELECT 
+select 
     p.brand,
-    COUNT(DISTINCT o.order_id) AS unique_online_orders
-FROM product p
-LEFT JOIN order_items oi ON p.product_id = oi.product_id
-LEFT JOIN orders o 
-    ON oi.order_id = o.order_id
-    AND o.order_status = 'Approved'
-    AND o.online_order = 'Yes'
-LEFT JOIN customer c 
+    count(distinct o.order_id) as unique_online_orders
+from product p
+left join order_items oi on p.product_id = oi.product_id
+left join orders o 
+    on oi.order_id = o.order_id
+    and o.order_status = 'Approved'
+    and o.online_order = 'Yes'
+left join customer c 
     ON o.customer_id = c.customer_id
-    AND c.job_industry_category = 'IT'
-GROUP BY p.brand
-ORDER BY p.brand;
+    and c.job_industry_category = 'IT'
+group by p.brand
+order by p.brand;
 
 --4
 --Решение с использованием GROUP BY
-SELECT
+select
     c.customer_id,
     c.first_name,
     c.last_name,
-    SUM(oi.quantity * oi.item_list_price_at_sale) AS total_revenue,
-    MIN(oi.quantity * oi.item_list_price_at_sale) AS min_order_amount,
-    MAX(oi.quantity * oi.item_list_price_at_sale) AS max_order_amount,
-    COUNT(DISTINCT o.order_id) AS total_orders,
-    AVG(order_sum) AS avg_order_amount
-FROM customer c
-JOIN orders o ON c.customer_id = o.customer_id
-JOIN order_items oi ON o.order_id = oi.order_id
-JOIN (
-    -- подзапрос для суммирования по каждому заказу
-    SELECT
+    sum(oi.quantity * oi.item_list_price_at_sale) as total_revenue,
+    min(oi.quantity * oi.item_list_price_at_sale) as min_order_amount,
+    max(oi.quantity * oi.item_list_price_at_sale) as max_order_amount,
+    count(distinct o.order_id) as total_orders,
+    avg(order_sum) as avg_order_amount
+from customer c
+join orders o on c.customer_id = o.customer_id
+join order_items oi on o.order_id = oi.order_id
+join (
+    select
         o2.order_id,
-        SUM(oi2.quantity * oi2.item_list_price_at_sale) AS order_sum
-    FROM orders o2
-    JOIN order_items oi2 ON o2.order_id = oi2.order_id
-    GROUP BY o2.order_id
-) os ON o.order_id = os.order_id
-GROUP BY c.customer_id, c.first_name, c.last_name
-ORDER BY total_revenue DESC, total_orders DESC;
+        sum(oi2.quantity * oi2.item_list_price_at_sale) as order_sum
+    from orders o2
+    join order_items oi2 on o2.order_id = oi2.order_id
+    group by o2.order_id
+) os on o.order_id = os.order_id
+group by c.customer_id, c.first_name, c.last_name
+order by total_revenue desc, total_orders desc;
 
 --Решение с использованием только оконных функций (window functions)
-WITH order_sums AS (
-    SELECT
+with order_sums as (
+    select
         o.order_id,
         o.customer_id,
-        SUM(oi.quantity * oi.item_list_price_at_sale) AS order_sum
-    FROM orders o
-    JOIN order_items oi ON o.order_id = oi.order_id
-    GROUP BY o.order_id, o.customer_id
+        sum(oi.quantity * oi.item_list_price_at_sale) as order_sum
+    from orders o
+    join order_items oi on o.order_id = oi.order_id
+    group by o.order_id, o.customer_id
 ),
-window_calc AS (
-    SELECT
+window_calc as (
+    select
         c.customer_id,
         c.first_name,
         c.last_name,
         order_sum,
-        SUM(order_sum) OVER (PARTITION BY c.customer_id) AS total_revenue,
-        MIN(order_sum) OVER (PARTITION BY c.customer_id) AS min_order_amount,
-        MAX(order_sum) OVER (PARTITION BY c.customer_id) AS max_order_amount,
-        COUNT(order_sum) OVER (PARTITION BY c.customer_id) AS total_orders,
-        AVG(order_sum) OVER (PARTITION BY c.customer_id) AS avg_order_amount,
-        ROW_NUMBER() OVER (PARTITION BY c.customer_id ORDER BY order_sum DESC) AS rn
-    FROM customer c
-    JOIN order_sums os ON c.customer_id = os.customer_id
+        sum(order_sum) over (partition by c.customer_id) as total_revenue,
+        min(order_sum) over (partition by c.customer_id) as min_order_amount,
+        max(order_sum) over (partition by c.customer_id) as max_order_amount,
+        count(order_sum) over (partition by c.customer_id) as total_orders,
+        avg(order_sum) over (partition by c.customer_id) as avg_order_amount,
+        row_number() over (partition by c.customer_id order by order_sum desc) as rn
+    from customer c
+    join order_sums os on c.customer_id = os.customer_id
 )
-SELECT
+select
     customer_id,
     first_name,
     last_name,
@@ -146,164 +145,147 @@ SELECT
     max_order_amount,
     total_orders,
     avg_order_amount
-FROM window_calc
-WHERE rn = 1  -- выбираем одну строку на клиента
-ORDER BY total_revenue DESC, total_orders DESC;
+from window_calc
+where rn = 1
+order by total_revenue desc, total_orders desc;
 
 
 --5
-WITH order_sums AS (
-    -- Сумма по каждому заказу
-    SELECT
-        o.customer_id,
-        SUM(oi.quantity * oi.item_list_price_at_sale) AS order_sum
-    FROM orders o
-    JOIN order_items oi ON o.order_id = oi.order_id
-    GROUP BY o.customer_id
-),
-customer_totals AS (
-    -- Сумма заказов по каждому клиенту (клиенты без заказов → 0)
-    SELECT
+with customer_totals as (
+    select
         c.customer_id,
         c.first_name,
         c.last_name,
-        COALESCE(os.order_sum, 0) AS total_revenue
-    FROM customer c
-    LEFT JOIN order_sums os ON c.customer_id = os.customer_id
+        coalesce(sum(oi.quantity * oi.item_list_price_at_sale), 0) as total_revenue
+    from customer c
+    left join orders o on c.customer_id = o.customer_id
+    left join order_items oi on o.order_id = oi.order_id
+    group by c.customer_id, c.first_name, c.last_name
 ),
-ranked AS (
-    -- Ранжирование по суммам
-    SELECT
-        *,
-        RANK() OVER (ORDER BY total_revenue ASC)  AS r_min,
-        RANK() OVER (ORDER BY total_revenue DESC) AS r_max
-    FROM customer_totals
+ranked_min as (
+    select *
+    from customer_totals
+    order by total_revenue asc
+    limit 3
+),
+ranked_max as (
+    select *
+    from customer_totals
+    order by total_revenue desc
+    limit 3
 )
-SELECT
-    customer_id,
-    first_name,
-    last_name,
-    total_revenue,
-    CASE 
-        WHEN r_min <= 3 THEN 'TOP-3 MIN'
-        WHEN r_max <= 3 THEN 'TOP-3 MAX'
-    END AS category
-FROM ranked
-WHERE r_min_
+select *
+from ranked_min
+union all
+select *
+from ranked_max
+order by total_revenue;
 
 
 --6
-WITH order_sums AS (
-    -- Сумма каждой транзакции (каждого заказа)
-    SELECT
+with order_sums as (
+    select
         o.order_id,
         o.customer_id,
         o.order_date,
-        SUM(oi.quantity * oi.item_list_price_at_sale) AS order_sum
-    FROM orders o
-    JOIN order_items oi ON o.order_id = oi.order_id
-    GROUP BY o.order_id, o.customer_id, o.order_date
+        sum(oi.quantity * oi.item_list_price_at_sale) as order_sum
+    from orders o
+    join order_items oi on o.order_id = oi.order_id
+    group by o.order_id, o.customer_id, o.order_date
 ),
-ordered AS (
-    -- Нумерация транзакций каждого клиента по времени
-    SELECT
+ordered as (
+    select
         customer_id,
         order_id,
         order_date,
         order_sum,
-        ROW_NUMBER() OVER (
-            PARTITION BY customer_id
-            ORDER BY order_date
-        ) AS rn
-    FROM order_sums
+        row_number() over (
+            partition by customer_id
+            order by order_date
+        ) as rn
+    from order_sums
 )
-SELECT
+select
     customer_id,
     order_id,
     order_date,
     order_sum
-FROM ordered
-WHERE rn = 2        -- только вторая транзакция
-ORDER BY customer_id;
+from ordered
+where rn = 2
+order by customer_id;
 
 --7
-WITH ordered AS (
-    -- Упорядочиваем заказы клиента по дате
-    SELECT
+with ordered as (
+    select
         o.customer_id,
         o.order_id,
         o.order_date,
-        LAG(o.order_date) OVER (
-            PARTITION BY o.customer_id
-            ORDER BY o.order_date
-        ) AS prev_order_date
-    FROM orders o
+        lag(o.order_date) over (
+            partition by o.customer_id
+            order by o.order_date
+        ) as prev_order_date
+    from orders o
 ),
-intervals AS (
-    -- Вычисляем интервалы между соседними заказами
-    SELECT
+intervals as (
+    select
         customer_id,
         order_id,
         order_date,
         prev_order_date,
-        (order_date - prev_order_date) AS diff_days
-    FROM ordered
-    WHERE prev_order_date IS NOT NULL   -- исключаем клиентов с одним заказом
+        (order_date - prev_order_date) as diff_days
+    from ordered
+    where prev_order_date is not null
 ),
-max_intervals AS (
-    -- Находим максимальный интервал по каждому клиенту
-    SELECT
+max_intervals as (
+    select
         customer_id,
-        MAX(diff_days) AS max_interval_days
-    FROM intervals
-    GROUP BY customer_id
+        max(diff_days) as max_interval_days
+    from intervals
+    group by customer_id
 )
-SELECT
+select
     c.first_name,
     c.last_name,
     c.job_title,
     mi.max_interval_days
-FROM max_intervals mi
-JOIN customer c ON c.customer_id = mi.customer_id
-ORDER BY mi.max_interval_days DESC;
+from max_intervals mi
+join customer c on c.customer_id = mi.customer_id
+order by mi.max_interval_days desc;
 
 --8
-WITH order_sums AS (
-    -- Сумма каждого заказа
-    SELECT
+with order_sums as (
+    select
         o.customer_id,
-        SUM(oi.quantity * oi.item_list_price_at_sale) AS order_sum
-    FROM orders o
-    JOIN order_items oi ON o.order_id = oi.order_id
-    GROUP BY o.customer_id
+        sum(oi.quantity * oi.item_list_price_at_sale) as order_sum
+    from orders o
+    join order_items oi on o.order_id = oi.order_id
+    group by o.customer_id
 ),
-customer_totals AS (
-    -- Сумма заказов по каждому клиенту (клиенты без заказов → 0)
-    SELECT
+customer_totals as (
+    select
         c.customer_id,
         c.first_name,
         c.last_name,
         c.wealth_segment,
-        COALESCE(os.order_sum, 0) AS total_revenue
-    FROM customer c
-    LEFT JOIN order_sums os ON c.customer_id = os.customer_id
+        coalesce(os.order_sum, 0) as total_revenue
+    from customer c
+    left join order_sums os on c.customer_id = os.customer_id
 ),
-ranked AS (
-    -- Ранжирование клиентов внутри каждого сегмента
-    SELECT
+ranked as (
+    select
         *,
-        RANK() OVER (
-            PARTITION BY wealth_segment
-            ORDER BY total_revenue DESC
-        ) AS rnk
-    FROM customer_totals
+        rank() over (
+            partition by wealth_segment
+            order by total_revenue desc
+        ) as rnk
+    from customer_totals
 )
-SELECT
+select
     first_name,
     last_name,
     wealth_segment,
     total_revenue
-FROM ranked
-WHERE rnk <= 5
-ORDER BY wealth_segment, total_revenue DESC;
+from ranked
+where rnk <= 5
+order by wealth_segment, total_revenue desc;
 
