@@ -1,59 +1,47 @@
--- ============================
--- Таблица: customer
--- ============================
-CREATE TABLE customer (
-    customer_id        SERIAL PRIMARY KEY,
-    first_name         VARCHAR(100),
-    last_name          VARCHAR(100),
-    gender             VARCHAR(20),
-    DOB                DATE,
-    job_title          VARCHAR(200),
-    job_industry_category VARCHAR(200),
-    wealth_segment     VARCHAR(100),
-    deceased_indicator VARCHAR(10),
-    owns_car           VARCHAR(10),
-    address            VARCHAR(300),
-    postcode           VARCHAR(20),
-    state              VARCHAR(100),
-    country            VARCHAR(100),
-    property_valuation INTEGER
+create table customer (
+    customer_id int not null primary key,
+    first_name text,
+    last_name text,
+    gender text,
+    dob date,
+    job_title text,
+    job_industry_category text,
+    wealth_segment text,
+    deceased_indicator char(1),
+    owns_car bool,
+    address text,
+    postcode int,
+    state text,
+    country text,
+    property_valuation int
 );
 
--- ============================
--- Таблица: product
--- ============================
-CREATE TABLE product (
-    product_id     SERIAL PRIMARY KEY,
-    brand          VARCHAR(100),
-    product_line   VARCHAR(100),
-    product_class  VARCHAR(100),
-    product_size   VARCHAR(100),
-    list_price     NUMERIC(12,2),
-    standard_cost  NUMERIC(12,2)
+create table product (
+    product_id int not null primary key,
+    brand text,
+    product_line text,
+    product_class text,
+    product_size text,
+    list_price int,
+    standard_cost int
 );
 
--- ============================
--- Таблица: orders
--- ============================
 CREATE TABLE orders (
-    order_id     SERIAL PRIMARY KEY,
-    customer_id  INTEGER REFERENCES customer(customer_id),
-    order_date   DATE,
-    online_order VARCHAR(10),
-    order_status VARCHAR(50)
+    order_id int primary key,
+    customer_id int not null,
+    order_date date not null,
+    online_order bool,
+    order_status bool not null
 );
 
--- ============================
--- Таблица: order_items
--- ============================
-CREATE TABLE order_items (
-    order_item_id               SERIAL PRIMARY KEY,
-    order_id                    INTEGER REFERENCES orders(order_id),
-    product_id                  INTEGER REFERENCES product(product_id),
-    quantity                    INTEGER,
-    item_list_price_at_sale     NUMERIC(12,2),
-    item_standard_cost_at_sale  NUMERIC(12,2)
-
+create table order_items (
+    order_item_id int primary key,
+    order_id int not null,
+    product_id int not null,
+    quantity int not null,
+    item_list_price_at_sale float4 not null,
+    item_standard_cost_at_sale float4
+);
 --1  
 SELECT 
     job_industry_category,
